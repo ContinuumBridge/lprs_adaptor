@@ -39,7 +39,7 @@ class Adaptor(CbAdaptor):
         self.apps =             {"galvanize_button": []}
         self.toSend = 0
         self.tracking = {}
-        self.address = 0x0000
+        self.address = 0xBBBB
         reactor.callLater(0.5, self.initRadio)
         # super's __init__ must be called:
         #super(Adaptor, self).__init__(argv)
@@ -77,54 +77,62 @@ class Adaptor(CbAdaptor):
                 bytesize=serial.EIGHTBITS,
                 timeout = 0.5
             )
-            reactor.callInThread(self.listen)
         except Exception as ex:
             self.cbLog("error", "Problems setting up serial port. Exception: " + str(type(ex)) + ", " + str(ex.args))
         else:
             try:
                 # Send RSSI with every packet received
+                """
                 if LPRS_TYPE == "ERA":
                     self.ser.write("ER_CMD#a01")
                     time.sleep(2)
                     self.ser.write("ACK")
                     time.sleep(2)
+                """
+                self.ser.write("ER_CMD#a00")
+                time.sleep(2)
+                self.ser.write("ACK")
+                time.sleep(2)
                 # Set bandwidth to 12.5 KHz
                 self.ser.write("ER_CMD#B0")
                 time.sleep(2)
                 self.ser.write("ACK")
                 self.cbLog("info", "Radio initialised")
+                reactor.callInThread(self.listen)
             except Exception as ex:
                 self.cbLog("warning", "Unable to initialise radio. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
     def listen(self):
         # Called in thread
-        message = ''
         while not self.doStop:
-            try:
-                message += self.ser.read(256)
+            if True:
+            #try:
+                message = self.ser.read(256)
+                #reactor.callFromThread(self.cbLog, "debug", "Message received from radio, length:" + str(len(message)))
                 if not self.doStop:
                     if message !='':
-                        destination = struct.unpack(">H", message[0:2])
+                        destination = struct.unpack(">H", message[0:2])[0]
+                        reactor.callFromThread(self.cbLog, "debug", "destination: " + str("{0:#0{1}X}".format(destination,6)))
                         if destination == self.address:
-                            source = struct.unpack(">H", message[2:4])
-                            function = struct.unpack("B", message[4])
-                            length = struct.unpack("B", message[5])
+                            source, function, length = struct.unpack(">HBB", message[2:6])
+                            reactor.callFromThread(self.cbLog, "debug", "source: " + str("{0:#0{1}X}".format(source,6)))
+                            reactor.callFromThread(self.cbLog, "debug", "function: " + str("{0:#0{1}X}".format(function,4)))
+                            reactor.callFromThread(self.cbLog, "debug", "length: " + str(length))
                             if GALVANIZE_TYPE == "NODE":
-                                wakeup = struct.unpack(">H", message[6:8])
+                                wakeup = struct.unpack(">H", message[6:8])[0]
+                                reactor.callFromThread(self.cbLog, "debug", "wakeup: " + str(wakeup))
                                 payload = message[8:]
                             else:
                                 wakeup = ""
-                                payload = message[6:]
-                            self.cbLog("debug", "function: " + function +  "length: " + length)
-                            self.cbLog("debug", "payload: " + payload)
+                                payload = message[6:][0]
+                            reactor.callFromThread(self.cbLog, "debug", "payload: " + str(payload))
                             characteristic = {
                                 "function": function,
                                 "payload": payload
                             }
-                            self.sendCharacteristic("galvanize_button", characteristic, time.time())
-                            message = ''
-            except Exception as ex:
-                self.cbLog("warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
+                            reactor.callFromThread(self.sendCharacteristic, "galvanize_button", characteristic, time.time())
+            #except Exception as ex:
+            #    self.cbLog("warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
     def transmitThread(self, message):
         try:
@@ -192,6 +200,7 @@ class Adaptor(CbAdaptor):
             May be called again if there is a new configuration, which
             could be because a new app has been added.
         """
+        self.cbLog("debug", "GALVANIZE_TYPE: " + GALVANIZE_TYPE)
         self.setState("starting")
 
 if __name__ == '__main__':
