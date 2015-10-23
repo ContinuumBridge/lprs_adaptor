@@ -8,20 +8,38 @@ import sys
 import time
 import json
 import serial
+import struct
 from cbcommslib import CbAdaptor
 from cbconfig import *
 from twisted.internet import threads
 from twisted.internet import reactor
 
 LPRS_TYPE = os.getenv('CB_LPRS_TYPE', 'ERA')
+GALVANIZE_TYPE = os.getenv('CB_GALVANIZE_TYPE', 'BRIDGE')
+WAKEUPINTERVAL = 360
+
+FUNCTIONS = {
+    "beacon": 0xBE,
+    "woken_up": 0xAA,
+    "acknowledge": 0xAC,
+    "include_req": 0x00,
+    "include_grant": 0x02,
+    "reinclude": 0x04,
+    "config": 0x05,
+    "send_battery": 0x07,
+    "alert": 0xAE,
+    "battery_status": 0xBA
+}
 
 class Adaptor(CbAdaptor):
     def __init__(self, argv):
         self.status =           "ok"
         self.state =            "stopped"
         self.stop = False
-        self.apps =             {"rssi": []}
+        self.apps =             {"galvanize_button": []}
         self.toSend = 0
+        self.tracking = {}
+        self.address = 0x0000
         reactor.callLater(0.5, self.initRadio)
         # super's __init__ must be called:
         #super(Adaptor, self).__init__(argv)
@@ -74,37 +92,48 @@ class Adaptor(CbAdaptor):
                 self.ser.write("ER_CMD#B0")
                 time.sleep(2)
                 self.ser.write("ACK")
-                time.sleep(2)
-                reactor.callLater(2, self.sendData)
                 self.cbLog("info", "Radio initialised")
             except Exception as ex:
                 self.cbLog("warning", "Unable to initialise radio. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
     def listen(self):
         # Called in thread
-        listen_txt = ''
+        message = ''
         while not self.doStop:
-            while self.ser.inWaiting()>0 and not self.doStop:
-                time.sleep(0.005)
-                listen_txt += self.ser.read(1)
-            if not self.doStop:
-                if listen_txt !='':
-                    rssi = ord(listen_txt[0])
-                    message = listen_txt[1:]
-                    self.cbLog("debug",  "rssi: " + str(rssi) + ", message: " + message)
-                    self.sendCharacteristic("rssi", rssi, time.time())
-                    listen_txt = ''
-            time.sleep(0.1)
+            try:
+                message += self.ser.read(256)
+                if not self.doStop:
+                    if message !='':
+                        destination = struct.unpack(">H", message[0:2])
+                        if destination == self.address:
+                            source = struct.unpack(">H", message[2:4])
+                            function = struct.unpack("B", message[4])
+                            length = struct.unpack("B", message[5])
+                            if GALVANIZE_TYPE == "NODE":
+                                wakeup = struct.unpack(">H", message[6:8])
+                                payload = message[8:]
+                            else:
+                                wakeup = ""
+                                payload = message[6:]
+                            self.cbLog("debug", "function: " + function +  "length: " + length)
+                            self.cbLog("debug", "payload: " + payload)
+                            characteristic = {
+                                "function": function,
+                                "payload": payload
+                            }
+                            self.sendCharacteristic("galvanize_button", characteristic, time.time())
+                            message = ''
+            except Exception as ex:
+                self.cbLog("warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
-    def sendData(self):
+    def transmitThread(self, message):
         try:
-            self.toSend = (self.toSend + 1)%256
-            dat = str(hex(self.toSend)[2:])
-            self.cbLog("debug", "sending: " + dat)
-            self.ser.write(dat)
-            reactor.callLater(2, self.sendData)
+            self.ser.write(message)
         except Exception as ex:
-            self.cbLog("warning", "Unable to send data. Exception: " + str(type(ex)) + ", " + str(ex.args))
+            self.cbLog("warning", "Problem sending message. Exception: " + str(type(ex)) + ", " + str(ex.args))
+
+    def transmit(self, message):
+        reactor.callInThread(self.transmitThread, message)
 
     def onAppInit(self, message):
         """
@@ -116,7 +145,7 @@ class Adaptor(CbAdaptor):
         resp = {"name": self.name,
                 "id": self.id,
                 "status": tagStatus,
-                "service": [{"characteristic": "rssi",
+                "service": [{"characteristic": "galvanize_button",
                              "interval": 0}
                             ],
                 "content": "service"}
@@ -134,12 +163,29 @@ class Adaptor(CbAdaptor):
                 self.apps[f["characteristic"]].append(message["id"])
         self.cbLog("debug", "apps: " + str(self.apps))
 
-    def onAppCommand(self, message):
-        if "data" not in message:
+    def onAppCommand(self, appCommand):
+        if "data" not in appCommand:
             self.cbLog("warning", "app message without data: " + str(message))
         else:
-            self.cbLog("debug", "Message from app: " +  str(message))
-            ser.write(message["data"])
+            self.cbLog("debug", "Message from app: " +  str(appCommand))
+            data = appCommand["data"]
+            try:
+                m = ""
+                m += struct.pack(">H", data["destination"])
+                m += struct.pack(">H", self.address)
+                m+= struct.pack("B", FUNCTIONS[data["function"]])
+                m+= struct.pack("B", 0)  # Placeholder for length
+                if GALVANIZE_TYPE == "BRIDGE":
+                    m+= struct.pack(">H", WAKEUPINTERVAL)
+                if "data" in data:
+                    m += data["data"]
+                length = struct.pack("B", len(m))
+                message = m[:5] + length + m[6:]
+            except Exception as ex:
+                self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
+            else:
+                self.transmit(message)
+                self.cbLog("debug", "message sent")
 
     def onConfigureMessage(self, config):
         """Config is based on what apps are to be connected.
