@@ -16,6 +16,7 @@ from twisted.internet import reactor
 
 LPRS_TYPE = os.getenv('CB_LPRS_TYPE', 'ERA')
 GALVANIZE_TYPE = os.getenv('CB_GALVANIZE_TYPE', 'BRIDGE')
+GALVANIZE_ADDRESS = os.getenv('CB_GALVANIZE_ADDRESS', '0x0000')
 WAKEUPINTERVAL = 360
 
 FUNCTIONS = {
@@ -39,7 +40,6 @@ class Adaptor(CbAdaptor):
         self.apps =             {"galvanize_button": []}
         self.toSend = 0
         self.tracking = {}
-        self.address = 0xBBBB
         reactor.callLater(0.5, self.initRadio)
         # super's __init__ must be called:
         #super(Adaptor, self).__init__(argv)
@@ -113,7 +113,7 @@ class Adaptor(CbAdaptor):
                     if message !='':
                         destination = struct.unpack(">H", message[0:2])[0]
                         reactor.callFromThread(self.cbLog, "debug", "destination: " + str("{0:#0{1}X}".format(destination,6)))
-                        if destination == self.address:
+                        if destination == GALVANIZE_ADDRESS:
                             source, function, length = struct.unpack(">HBB", message[2:6])
                             reactor.callFromThread(self.cbLog, "debug", "source: " + str("{0:#0{1}X}".format(source,6)))
                             reactor.callFromThread(self.cbLog, "debug", "function: " + str("{0:#0{1}X}".format(function,4)))
@@ -123,11 +123,12 @@ class Adaptor(CbAdaptor):
                                 reactor.callFromThread(self.cbLog, "debug", "wakeup: " + str(wakeup))
                                 payload = message[8:]
                             else:
-                                wakeup = ""
+                                wakeup = 0
                                 payload = message[6:][0]
                             reactor.callFromThread(self.cbLog, "debug", "payload: " + str(payload))
                             characteristic = {
                                 "function": function,
+                                "wakeup": wakeup,
                                 "payload": payload
                             }
                             reactor.callFromThread(self.sendCharacteristic, "galvanize_button", characteristic, time.time())
@@ -180,7 +181,7 @@ class Adaptor(CbAdaptor):
             try:
                 m = ""
                 m += struct.pack(">H", data["destination"])
-                m += struct.pack(">H", self.address)
+                m += struct.pack(">H", GALVANIZE_ADDRESS)
                 m+= struct.pack("B", FUNCTIONS[data["function"]])
                 m+= struct.pack("B", 0)  # Placeholder for length
                 if GALVANIZE_TYPE == "BRIDGE":
