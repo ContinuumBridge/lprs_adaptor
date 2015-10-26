@@ -122,10 +122,16 @@ class Adaptor(CbAdaptor):
                             if GALVANIZE_TYPE == "NODE":
                                 wakeup = struct.unpack(">H", message[6:8])[0]
                                 reactor.callFromThread(self.cbLog, "debug", "wakeup: " + str(wakeup))
-                                payload = message[8:][0]
+                                if length > 6:
+                                    payload = message[7:][0]
+                                else:
+                                    payload = ""
                             else:
                                 wakeup = 0
-                                payload = message[6:][0]
+                                if length > 6:
+                                    payload = message[6:][0]
+                                else:
+                                    payload = ""
                             reactor.callFromThread(self.cbLog, "debug", "payload: " + str(payload))
                             f = (key for key,value in FUNCTIONS.items() if value==function).next()
                             characteristic = {
@@ -192,7 +198,8 @@ class Adaptor(CbAdaptor):
                 if GALVANIZE_TYPE == "BRIDGE":
                     m+= struct.pack(">H", WAKEUPINTERVAL)
                 if "data" in data:
-                    m += data["data"]
+                    if data["data"] != "":
+                        m += data["data"]
                 length = struct.pack("B", len(m))
                 message = m[:5] + length + m[6:]
             #except Exception as ex:
