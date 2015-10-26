@@ -16,8 +16,9 @@ from twisted.internet import reactor
 
 LPRS_TYPE = os.getenv('CB_LPRS_TYPE', 'ERA')
 GALVANIZE_TYPE = os.getenv('CB_GALVANIZE_TYPE', 'BRIDGE')
-GALVANIZE_ADDRESS = os.getenv('CB_GALVANIZE_ADDRESS', '0x0000')
+GALVANIZE_ADDRESS = int(os.getenv('CB_GALVANIZE_ADDRESS', '0x0000'), 16)
 WAKEUPINTERVAL = 360
+BEACON_ADDRESS = 0xBBBB
 
 FUNCTIONS = {
     "beacon": 0xBE,
@@ -113,7 +114,7 @@ class Adaptor(CbAdaptor):
                     if message !='':
                         destination = struct.unpack(">H", message[0:2])[0]
                         reactor.callFromThread(self.cbLog, "debug", "destination: " + str("{0:#0{1}X}".format(destination,6)))
-                        if destination == GALVANIZE_ADDRESS:
+                        if destination == GALVANIZE_ADDRESS or destination == BEACON_ADDRESS:
                             source, function, length = struct.unpack(">HBB", message[2:6])
                             reactor.callFromThread(self.cbLog, "debug", "source: " + str("{0:#0{1}X}".format(source,6)))
                             reactor.callFromThread(self.cbLog, "debug", "function: " + str("{0:#0{1}X}".format(function,4)))
@@ -134,7 +135,6 @@ class Adaptor(CbAdaptor):
                             }
                             reactor.callFromThread(self.sendCharacteristic, "galvanize_button", characteristic, time.time())
                             reactor.callFromThread(self.cbLog, "debug", "characteriztic: " + str(characteristic))
-                        elif destination = BEACON_ADDRESS:
             #except Exception as ex:
             #    self.cbLog("warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
