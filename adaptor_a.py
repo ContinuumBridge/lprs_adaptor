@@ -22,7 +22,7 @@ WAKEUPINTERVAL = 360
 FUNCTIONS = {
     "beacon": 0xBE,
     "woken_up": 0xAA,
-    "acknowledge": 0xAC,
+    "ack": 0xAC,
     "include_req": 0x00,
     "include_grant": 0x02,
     "reinclude": 0x04,
@@ -121,17 +121,20 @@ class Adaptor(CbAdaptor):
                             if GALVANIZE_TYPE == "NODE":
                                 wakeup = struct.unpack(">H", message[6:8])[0]
                                 reactor.callFromThread(self.cbLog, "debug", "wakeup: " + str(wakeup))
-                                payload = message[8:]
+                                payload = message[8:][0]
                             else:
                                 wakeup = 0
                                 payload = message[6:][0]
                             reactor.callFromThread(self.cbLog, "debug", "payload: " + str(payload))
+                            f = (key for key,value in FUNCTIONS.items() if value==function).next()
                             characteristic = {
-                                "function": function,
+                                "function": f,
                                 "wakeup": wakeup,
-                                "payload": payload
+                                "data": payload
                             }
                             reactor.callFromThread(self.sendCharacteristic, "galvanize_button", characteristic, time.time())
+                            reactor.callFromThread(self.cbLog, "debug", "characteriztic: " + str(characteristic))
+                        elif destination = BEACON_ADDRESS:
             #except Exception as ex:
             #    self.cbLog("warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
