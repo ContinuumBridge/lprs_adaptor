@@ -129,6 +129,7 @@ class Adaptor(CbAdaptor):
                             reactor.callFromThread(self.cbLog, "debug", "payload: " + str(payload))
                             f = (key for key,value in FUNCTIONS.items() if value==function).next()
                             characteristic = {
+                                "source": source,
                                 "function": f,
                                 "wakeup": wakeup,
                                 "data": payload
@@ -181,7 +182,8 @@ class Adaptor(CbAdaptor):
         else:
             self.cbLog("debug", "Message from app: " +  str(appCommand))
             data = appCommand["data"]
-            try:
+            if True:
+            #try:
                 m = ""
                 m += struct.pack(">H", data["destination"])
                 m += struct.pack(">H", GALVANIZE_ADDRESS)
@@ -193,9 +195,9 @@ class Adaptor(CbAdaptor):
                     m += data["data"]
                 length = struct.pack("B", len(m))
                 message = m[:5] + length + m[6:]
-            except Exception as ex:
-                self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
-            else:
+            #except Exception as ex:
+            #    self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
+            #else:
                 self.transmit(message)
                 self.cbLog("debug", "message sent")
 
