@@ -196,12 +196,15 @@ class Adaptor(CbAdaptor):
                 m+= struct.pack("B", FUNCTIONS[data["function"]])
                 m+= struct.pack("B", 0)  # Placeholder for length
                 if GALVANIZE_TYPE == "BRIDGE":
-                    m+= struct.pack(">H", WAKEUPINTERVAL)
+                    if data["function"] != "beacon":
+                        m+= struct.pack(">H", WAKEUPINTERVAL)
                 if "data" in data:
                     if data["data"] != "":
                         m += data["data"]
                 length = struct.pack("B", len(m))
-                message = m[:5] + length + m[6:]
+                message = m[:5] + length
+                if len(m) > 6:
+                    message += m[6:]
             #except Exception as ex:
             #    self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
             #else:
