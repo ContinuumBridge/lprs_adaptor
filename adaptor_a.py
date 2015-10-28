@@ -17,7 +17,6 @@ from twisted.internet import reactor
 LPRS_TYPE = os.getenv('CB_LPRS_TYPE', 'ERA')
 GALVANIZE_TYPE = os.getenv('CB_GALVANIZE_TYPE', 'BRIDGE')
 GALVANIZE_ADDRESS = int(os.getenv('CB_GALVANIZE_ADDRESS', '0x0000'), 16)
-WAKEUPINTERVAL = 360
 BEACON_ADDRESS = 0xBBBB
 
 FUNCTIONS = {
@@ -129,7 +128,7 @@ class Adaptor(CbAdaptor):
                             else:
                                 wakeup = 0
                                 if length > 6:
-                                    payload = message[6:][0]
+                                    payload = message[5:][0]
                                 else:
                                     payload = ""
                             reactor.callFromThread(self.cbLog, "debug", "payload: " + str(payload))
@@ -197,7 +196,7 @@ class Adaptor(CbAdaptor):
                 m+= struct.pack("B", 0)  # Placeholder for length
                 if GALVANIZE_TYPE == "BRIDGE":
                     if data["function"] != "beacon":
-                        m+= struct.pack(">H", WAKEUPINTERVAL)
+                        m+= struct.pack(">H", data["wakeup_interval"])
                 if "data" in data:
                     if data["data"] != "":
                         m += data["data"]
