@@ -9,6 +9,7 @@ import time
 import json
 import serial
 import struct
+import base64
 from cbcommslib import CbAdaptor
 from cbconfig import *
 from twisted.internet import threads
@@ -113,16 +114,19 @@ class Adaptor(CbAdaptor):
                 if not self.doStop:
                     if message !='':
                         destination = struct.unpack(">H", message[0:2])[0]
-                        reactor.callFromThread(self.cbLog, "debug", "destination: " + str("{0:#0{1}X}".format(destination,6)))
+                        #reactor.callFromThread(self.cbLog, "debug", "destination: " + str("{0:#0{1}X}".format(destination,6)))
                         if destination == GALVANIZE_ADDRESS or destination == BEACON_ADDRESS:
                             source, function, length = struct.unpack(">HBB", message[2:6])
-                            reactor.callFromThread(self.cbLog, "debug", "source: " + str("{0:#0{1}X}".format(source,6)))
-                            reactor.callFromThread(self.cbLog, "debug", "function: " + str("{0:#0{1}X}".format(function,4)))
-                            reactor.callFromThread(self.cbLog, "debug", "length: " + str(length))
+                            #reactor.callFromThread(self.cbLog, "debug", "source: " + str("{0:#0{1}X}".format(source,6)))
+                            #reactor.callFromThread(self.cbLog, "debug", "function: " + str("{0:#0{1}X}".format(function,4)))
+                            #reactor.callFromThread(self.cbLog, "debug", "length: " + str(length))
                             if GALVANIZE_TYPE == "NODE":
-                                wakeup = struct.unpack(">H", message[6:8])[0]
-                                reactor.callFromThread(self.cbLog, "debug", "wakeup: " + str(wakeup))
                                 if length > 6:
+                                    wakeup = struct.unpack(">H", message[5:7])[0]
+                                    #reactor.callFromThread(self.cbLog, "debug", "wakeup: " + str(wakeup))
+                                else:
+                                    wakeup = 0
+                                if length > 8:
                                     payload = message[7:][0]
                                 else:
                                     payload = ""
@@ -132,16 +136,16 @@ class Adaptor(CbAdaptor):
                                     payload = message[6:][0]
                                 else:
                                     payload = ""
-                            reactor.callFromThread(self.cbLog, "debug", "payload: " + str(payload))
+                            #reactor.callFromThread(self.cbLog, "debug", "payload: " + str(payload))
                             f = (key for key,value in FUNCTIONS.items() if value==function).next()
                             characteristic = {
                                 "source": source,
                                 "function": f,
                                 "wakeup": wakeup,
-                                "data": payload
+                                "data": base64.b64encode(payload)
                             }
                             reactor.callFromThread(self.sendCharacteristic, "galvanize_button", characteristic, time.time())
-                            reactor.callFromThread(self.cbLog, "debug", "characteriztic: " + str(characteristic))
+                            #reactor.callFromThread(self.cbLog, "debug", "characteriztic: " + str(characteristic))
             #except Exception as ex:
             #    self.cbLog("warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
@@ -190,25 +194,27 @@ class Adaptor(CbAdaptor):
             data = appCommand["data"]
             if True:
             #try:
+                length = 6
+                if GALVANIZE_TYPE == "BRIDGE" and data["function"] != "beacon":
+                    length += 2
+                if "data" in "data":
+                    length += len(data)
                 m = ""
                 m += struct.pack(">H", data["destination"])
                 m += struct.pack(">H", GALVANIZE_ADDRESS)
                 m+= struct.pack("B", FUNCTIONS[data["function"]])
-                m+= struct.pack("B", 0)  # Placeholder for length
+                m+= struct.pack("B", length)
                 if GALVANIZE_TYPE == "BRIDGE":
                     if data["function"] != "beacon":
                         m+= struct.pack(">H", WAKEUPINTERVAL)
                 if "data" in data:
                     if data["data"] != "":
-                        m += data["data"]
-                length = struct.pack("B", len(m))
-                message = m[:5] + length
-                if len(m) > 6:
-                    message += m[6:]
+                        #m += struct.pack("s", data["data"])
+                        m += base64.b64decode(data["data"])
             #except Exception as ex:
             #    self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
             #else:
-                self.transmit(message)
+                self.transmit(m)
                 self.cbLog("debug", "message sent")
 
     def onConfigureMessage(self, config):
