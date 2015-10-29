@@ -115,14 +115,14 @@ class Adaptor(CbAdaptor):
                         #hexMessage = message.encode("hex")
                         #self.cbLog("debug", "hex message: " + str(hexMessage))
                         destination = struct.unpack(">H", message[0:2])[0]
-                        reactor.callFromThread(self.cbLog, "debug", "destination: " + str("{0:#0{1}X}".format(destination,6)))
+                        reactor.callFromThread(self.cbLog, "debug", "Rx: destination: " + str("{0:#0{1}X}".format(destination,6)))
                         if destination == GALVANIZE_ADDRESS or destination == BEACON_ADDRESS:
                             source, function, length = struct.unpack(">HBB", message[2:6])
                             #hexMessage = message.encode("hex")
                             #self.cbLog("debug", "hex message after decode: " + str(hexMessage))
                             #reactor.callFromThread(self.cbLog, "debug", "source: " + str("{0:#0{1}X}".format(source,6)))
-                            reactor.callFromThread(self.cbLog, "debug", "function: " + str("{0:#0{1}X}".format(function,4)))
-                            reactor.callFromThread(self.cbLog, "debug", "length: " + str(length))
+                            reactor.callFromThread(self.cbLog, "debug", "Rx: function: " + str("{0:#0{1}X}".format(function,4)))
+                            reactor.callFromThread(self.cbLog, "debug", "Rx: length: " + str(length))
                             #reactor.callFromThread(self.cbLog, "debug", "payload length: " + str(len(message[5:][0])))
                             print("LPRS payload: %s", message[5:][0])
                             if GALVANIZE_TYPE == "NODE":
@@ -142,7 +142,7 @@ class Adaptor(CbAdaptor):
                                 else:
                                     payload = ""
                             hexPayload = payload.encode("hex")
-                            reactor.callFromThread(self.cbLog, "debug", "payload: " + str(hexPayload) + ", length: " + str(len(payload)))
+                            reactor.callFromThread(self.cbLog, "debug", "Rx: payload: " + str(hexPayload) + ", length: " + str(len(payload)))
                             f = (key for key,value in FUNCTIONS.items() if value==function).next()
                             characteristic = {
                                 "source": source,
@@ -196,7 +196,7 @@ class Adaptor(CbAdaptor):
         if "data" not in appCommand:
             self.cbLog("warning", "app message without data: " + str(message))
         else:
-            self.cbLog("debug", "Message from app: " +  str(appCommand))
+            self.cbLog("debug", "Tx: Message from app: " +  str(appCommand))
             data = appCommand["data"]
             if True:
             #try:
@@ -221,7 +221,7 @@ class Adaptor(CbAdaptor):
                 if rawData:
                     m += rawData
                 hexPayload = m.encode("hex")
-                self.cbLog("debug", "sending: " + str(hexPayload))
+                self.cbLog("debug", "Tx: sending: " + str(hexPayload))
             #except Exception as ex:
             #    self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
             #else:
