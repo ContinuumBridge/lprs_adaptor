@@ -109,21 +109,21 @@ class Adaptor(CbAdaptor):
             if True:
             #try:
                 message = self.ser.read(256)
-                reactor.callFromThread(self.cbLog, "debug", "Message received from radio, length:" + str(len(message)))
+                #reactor.callFromThread(self.cbLog, "debug", "Message received from radio, length:" + str(len(message)))
                 if not self.doStop:
                     if message !='':
-                        hexMessage = message.encode("hex")
-                        self.cbLog("debug", "hex message: " + str(hexMessage))
+                        #hexMessage = message.encode("hex")
+                        #self.cbLog("debug", "hex message: " + str(hexMessage))
                         destination = struct.unpack(">H", message[0:2])[0]
                         reactor.callFromThread(self.cbLog, "debug", "destination: " + str("{0:#0{1}X}".format(destination,6)))
                         if destination == GALVANIZE_ADDRESS or destination == BEACON_ADDRESS:
                             source, function, length = struct.unpack(">HBB", message[2:6])
-                            hexMessage = message.encode("hex")
-                            self.cbLog("debug", "hex message after decode: " + str(hexMessage))
-                            reactor.callFromThread(self.cbLog, "debug", "source: " + str("{0:#0{1}X}".format(source,6)))
+                            #hexMessage = message.encode("hex")
+                            #self.cbLog("debug", "hex message after decode: " + str(hexMessage))
+                            #reactor.callFromThread(self.cbLog, "debug", "source: " + str("{0:#0{1}X}".format(source,6)))
                             reactor.callFromThread(self.cbLog, "debug", "function: " + str("{0:#0{1}X}".format(function,4)))
                             reactor.callFromThread(self.cbLog, "debug", "length: " + str(length))
-                            reactor.callFromThread(self.cbLog, "debug", "payload length: " + str(len(message[5:][0])))
+                            #reactor.callFromThread(self.cbLog, "debug", "payload length: " + str(len(message[5:][0])))
                             print("LPRS payload: %s", message[5:][0])
                             if GALVANIZE_TYPE == "NODE":
                                 if length > 6:
@@ -206,7 +206,7 @@ class Adaptor(CbAdaptor):
                 if "data" in data:
                     rawData = base64.b64decode(data["data"])
                     length += len(rawData)
-                    self.cbLog("debug", "rawData length: " + str(len(rawData)))
+                    #self.cbLog("debug", "rawData length: " + str(len(rawData)))
                 else:
                     rawData = None
                 m = ""
@@ -214,7 +214,7 @@ class Adaptor(CbAdaptor):
                 m += struct.pack(">H", GALVANIZE_ADDRESS)
                 m+= struct.pack("B", FUNCTIONS[data["function"]])
                 m+= struct.pack("B", length)
-                self.cbLog("debug", "length: " +  str(length))
+                #self.cbLog("debug", "length: " +  str(length))
                 if GALVANIZE_TYPE == "BRIDGE":
                     if data["function"] != "beacon":
                         m+= struct.pack(">H", data["wakeup_interval"])
@@ -226,7 +226,7 @@ class Adaptor(CbAdaptor):
             #    self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
             #else:
                 self.transmit(m)
-                self.cbLog("debug", "message sent")
+                #self.cbLog("debug", "message sent")
 
     def onConfigureMessage(self, config):
         """Config is based on what apps are to be connected.
