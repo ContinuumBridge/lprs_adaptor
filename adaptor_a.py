@@ -109,16 +109,22 @@ class Adaptor(CbAdaptor):
             if True:
             #try:
                 message = self.ser.read(256)
-                #reactor.callFromThread(self.cbLog, "debug", "Message received from radio, length:" + str(len(message)))
+                reactor.callFromThread(self.cbLog, "debug", "Message received from radio, length:" + str(len(message)))
                 if not self.doStop:
                     if message !='':
+                        hexMessage = message.encode("hex")
+                        self.cbLog("debug", "hex message: " + str(hexMessage))
                         destination = struct.unpack(">H", message[0:2])[0]
-                        #reactor.callFromThread(self.cbLog, "debug", "destination: " + str("{0:#0{1}X}".format(destination,6)))
+                        reactor.callFromThread(self.cbLog, "debug", "destination: " + str("{0:#0{1}X}".format(destination,6)))
                         if destination == GALVANIZE_ADDRESS or destination == BEACON_ADDRESS:
                             source, function, length = struct.unpack(">HBB", message[2:6])
-                            #reactor.callFromThread(self.cbLog, "debug", "source: " + str("{0:#0{1}X}".format(source,6)))
-                            #reactor.callFromThread(self.cbLog, "debug", "function: " + str("{0:#0{1}X}".format(function,4)))
-                            #reactor.callFromThread(self.cbLog, "debug", "length: " + str(length))
+                            hexMessage = message.encode("hex")
+                            self.cbLog("debug", "hex message after decode: " + str(hexMessage))
+                            reactor.callFromThread(self.cbLog, "debug", "source: " + str("{0:#0{1}X}".format(source,6)))
+                            reactor.callFromThread(self.cbLog, "debug", "function: " + str("{0:#0{1}X}".format(function,4)))
+                            reactor.callFromThread(self.cbLog, "debug", "length: " + str(length))
+                            reactor.callFromThread(self.cbLog, "debug", "payload length: " + str(len(message[5:][0])))
+                            print("LPRS payload: %s", message[5:][0])
                             if GALVANIZE_TYPE == "NODE":
                                 if length > 6:
                                     wakeup = struct.unpack(">H", message[5:7])[0]
@@ -126,16 +132,17 @@ class Adaptor(CbAdaptor):
                                 else:
                                     wakeup = 0
                                 if length > 8:
-                                    payload = message[7:][0]
+                                    payload = message[8:]
                                 else:
                                     payload = ""
                             else:
                                 wakeup = 0
                                 if length > 6:
-                                    payload = message[5:][0]
+                                    payload = message[6:]
                                 else:
                                     payload = ""
-                            #reactor.callFromThread(self.cbLog, "debug", "payload: " + str(payload))
+                            hexPayload = payload.encode("hex")
+                            reactor.callFromThread(self.cbLog, "debug", "payload: " + str(hexPayload) + ", length: " + str(len(payload)))
                             f = (key for key,value in FUNCTIONS.items() if value==function).next()
                             characteristic = {
                                 "source": source,
@@ -196,13 +203,14 @@ class Adaptor(CbAdaptor):
                 length = 6
                 if GALVANIZE_TYPE == "BRIDGE" and data["function"] != "beacon":
                     length += 2
-                if "data" in "data":
+                if "data" in data:
                     length += len(data)
                 m = ""
                 m += struct.pack(">H", data["destination"])
                 m += struct.pack(">H", GALVANIZE_ADDRESS)
                 m+= struct.pack("B", FUNCTIONS[data["function"]])
                 m+= struct.pack("B", length)
+                self.cbLog("debug", "length: " +  str(length))
                 if GALVANIZE_TYPE == "BRIDGE":
                     if data["function"] != "beacon":
                         m+= struct.pack(">H", data["wakeup_interval"])
