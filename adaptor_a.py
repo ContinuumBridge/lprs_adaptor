@@ -196,8 +196,12 @@ class Adaptor(CbAdaptor):
                 length = 6
                 if GALVANIZE_TYPE == "BRIDGE" and data["function"] != "beacon":
                     length += 2
-                if "data" in "data":
-                    length += len(data)
+                if "data" in data:
+                    rawData = base64.b64decode(data["data"])
+                    length += len(rawData)
+                    self.cbLog("debug", "rawData length: " + str(len(rawData)))
+                else:
+                    rawData = None
                 m = ""
                 m += struct.pack(">H", data["destination"])
                 m += struct.pack(">H", GALVANIZE_ADDRESS)
@@ -206,10 +210,10 @@ class Adaptor(CbAdaptor):
                 if GALVANIZE_TYPE == "BRIDGE":
                     if data["function"] != "beacon":
                         m+= struct.pack(">H", data["wakeup_interval"])
-                if "data" in data:
-                    if data["data"] != "":
-                        #m += struct.pack("s", data["data"])
-                        m += base64.b64decode(data["data"])
+                if rawData:
+                    m += rawData
+                hexPayload = m.encode("hex")
+                self.cbLog("debug", "sending: " + str(hexPayload))
             #except Exception as ex:
             #    self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
             #else:
