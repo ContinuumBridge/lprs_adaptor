@@ -15,23 +15,9 @@ from cbconfig import *
 from twisted.internet import threads
 from twisted.internet import reactor
 
-LPRS_TYPE = os.getenv('CB_LPRS_TYPE', 'ERA')
-GALVANIZE_TYPE = os.getenv('CB_GALVANIZE_TYPE', 'BRIDGE')
-GALVANIZE_ADDRESS = int(os.getenv('CB_GALVANIZE_ADDRESS', '0x0000'), 16)
-BEACON_ADDRESS = 0xBBBB
-
-FUNCTIONS = {
-    "beacon": 0xBE,
-    "woken_up": 0xAA,
-    "ack": 0xAC,
-    "include_req": 0x00,
-    "include_grant": 0x02,
-    "reinclude": 0x04,
-    "config": 0x05,
-    "send_battery": 0x07,
-    "alert": 0xAE,
-    "battery_status": 0xBA
-}
+LPRS_TYPE           = os.getenv('CB_LPRS_TYPE', 'ERA')
+GALVANIZE_TYPE      = os.getenv('CB_GALVANIZE_TYPE', 'BRIDGE')
+GALVANIZE_ADDRESS   = int(os.getenv('CB_GALVANIZE_ADDRESS', '0x0000'), 16)
 
 class Adaptor(CbAdaptor):
     def __init__(self, argv):
@@ -112,46 +98,8 @@ class Adaptor(CbAdaptor):
                 #reactor.callFromThread(self.cbLog, "debug", "Message received from radio, length:" + str(len(message)))
                 if not self.doStop:
                     if message !='':
-                        #hexMessage = message.encode("hex")
-                        #self.cbLog("debug", "hex message: " + str(hexMessage))
-                        destination = struct.unpack(">H", message[0:2])[0]
-                        reactor.callFromThread(self.cbLog, "debug", "Rx: destination: " + str("{0:#0{1}X}".format(destination,6)))
-                        if destination == GALVANIZE_ADDRESS or destination == BEACON_ADDRESS:
-                            source, function, length = struct.unpack(">HBB", message[2:6])
-                            #hexMessage = message.encode("hex")
-                            #self.cbLog("debug", "hex message after decode: " + str(hexMessage))
-                            #reactor.callFromThread(self.cbLog, "debug", "source: " + str("{0:#0{1}X}".format(source,6)))
-                            reactor.callFromThread(self.cbLog, "debug", "Rx: function: " + str("{0:#0{1}X}".format(function,4)))
-                            reactor.callFromThread(self.cbLog, "debug", "Rx: length: " + str(length))
-                            #reactor.callFromThread(self.cbLog, "debug", "payload length: " + str(len(message[5:][0])))
-                            print("LPRS payload: %s", message[5:][0])
-                            if GALVANIZE_TYPE == "NODE":
-                                if length > 6:
-                                    wakeup = struct.unpack(">H", message[5:7])[0]
-                                    #reactor.callFromThread(self.cbLog, "debug", "wakeup: " + str(wakeup))
-                                else:
-                                    wakeup = 0
-                                if length > 8:
-                                    payload = message[8:]
-                                else:
-                                    payload = ""
-                            else:
-                                wakeup = 0
-                                if length > 6:
-                                    payload = message[6:]
-                                else:
-                                    payload = ""
-                            hexPayload = payload.encode("hex")
-                            reactor.callFromThread(self.cbLog, "debug", "Rx: payload: " + str(hexPayload) + ", length: " + str(len(payload)))
-                            f = (key for key,value in FUNCTIONS.items() if value==function).next()
-                            characteristic = {
-                                "source": source,
-                                "function": f,
-                                "wakeup": wakeup,
-                                "data": base64.b64encode(payload)
-                            }
-                            reactor.callFromThread(self.sendCharacteristic, "galvanize_button", characteristic, time.time())
-                            #reactor.callFromThread(self.cbLog, "debug", "characteriztic: " + str(characteristic))
+                        characteristic = base64.b64encode(message)
+                        reactor.callFromThread(self.sendCharacteristic, "galvanize_button", characteristic, time.time())
             #except Exception as ex:
             #    self.cbLog("warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
@@ -160,9 +108,6 @@ class Adaptor(CbAdaptor):
             self.ser.write(message)
         except Exception as ex:
             self.cbLog("warning", "Problem sending message. Exception: " + str(type(ex)) + ", " + str(ex.args))
-
-    def transmit(self, message):
-        reactor.callInThread(self.transmitThread, message)
 
     def onAppInit(self, message):
         """
@@ -197,36 +142,11 @@ class Adaptor(CbAdaptor):
             self.cbLog("warning", "app message without data: " + str(message))
         else:
             self.cbLog("debug", "Tx: Message from app: " +  str(appCommand))
-            data = appCommand["data"]
             if True:
             #try:
-                length = 6
-                if GALVANIZE_TYPE == "BRIDGE" and data["function"] != "beacon":
-                    length += 2
-                if "data" in data:
-                    rawData = base64.b64decode(data["data"])
-                    length += len(rawData)
-                    #self.cbLog("debug", "rawData length: " + str(len(rawData)))
-                else:
-                    rawData = None
-                m = ""
-                m += struct.pack(">H", data["destination"])
-                m += struct.pack(">H", GALVANIZE_ADDRESS)
-                m+= struct.pack("B", FUNCTIONS[data["function"]])
-                m+= struct.pack("B", length)
-                #self.cbLog("debug", "length: " +  str(length))
-                if GALVANIZE_TYPE == "BRIDGE":
-                    if data["function"] != "beacon":
-                        m+= struct.pack(">H", data["wakeup_interval"])
-                if rawData:
-                    m += rawData
-                hexPayload = m.encode("hex")
-                self.cbLog("debug", "Tx: sending: " + str(hexPayload))
+                reactor.callInThread(self.transmitThread, appCommand["data"])
             #except Exception as ex:
             #    self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
-            #else:
-                self.transmit(m)
-                #self.cbLog("debug", "message sent")
 
     def onConfigureMessage(self, config):
         """Config is based on what apps are to be connected.
