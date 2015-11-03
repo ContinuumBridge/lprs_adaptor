@@ -98,8 +98,8 @@ class Adaptor(CbAdaptor):
                 #reactor.callFromThread(self.cbLog, "debug", "Message received from radio, length:" + str(len(message)))
                 if not self.doStop:
                     if message !='':
-                        characteristic = base64.b64encode(message)
-                        reactor.callFromThread(self.sendCharacteristic, "galvanize_button", characteristic, time.time())
+                        data = base64.b64encode(message)
+                        reactor.callFromThread(self.sendCharacteristic, "galvanize_button", data, time.time())
             #except Exception as ex:
             #    self.cbLog("warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
@@ -107,7 +107,7 @@ class Adaptor(CbAdaptor):
         try:
             self.ser.write(message)
         except Exception as ex:
-            self.cbLog("warning", "Problem sending message. Exception: " + str(type(ex)) + ", " + str(ex.args))
+            reactor.callFromThread(self.cbLog, "warning", "Problem sending message. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
     def onAppInit(self, message):
         """
@@ -144,7 +144,7 @@ class Adaptor(CbAdaptor):
             self.cbLog("debug", "Tx: Message from app: " +  str(appCommand))
             if True:
             #try:
-                reactor.callInThread(self.transmitThread, appCommand["data"])
+                reactor.callInThread(self.transmitThread, base64.b64decode(appCommand["data"]))
             #except Exception as ex:
             #    self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
