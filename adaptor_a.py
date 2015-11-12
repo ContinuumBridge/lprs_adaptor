@@ -106,7 +106,6 @@ class Adaptor(CbAdaptor):
 
     def transmitThread(self, message):
         try:
-            self.cbLog("debug", "transmitting: " + str(message))
             self.cbLog("debug", "Tx: " + str(message.encode("hex")))
             self.ser.write(message)
         except Exception as ex:
