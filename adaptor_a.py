@@ -98,6 +98,7 @@ class Adaptor(CbAdaptor):
                 #reactor.callFromThread(self.cbLog, "debug", "Message received from radio, length:" + str(len(message)))
                 if not self.doStop:
                     if message !='':
+                        self.cbLog("debug", "Rx: " + str(message.encode("hex")))
                         data = base64.b64encode(message)
                         reactor.callFromThread(self.sendCharacteristic, "galvanize_button", data, time.time())
             #except Exception as ex:
@@ -105,6 +106,8 @@ class Adaptor(CbAdaptor):
 
     def transmitThread(self, message):
         try:
+            self.cbLog("debug", "transmitting: " + str(message))
+            self.cbLog("debug", "Tx: " + str(message.encode("hex")))
             self.ser.write(message)
         except Exception as ex:
             reactor.callFromThread(self.cbLog, "warning", "Problem sending message. Exception: " + str(type(ex)) + ", " + str(ex.args))
@@ -141,7 +144,7 @@ class Adaptor(CbAdaptor):
         if "data" not in appCommand:
             self.cbLog("warning", "app message without data: " + str(message))
         else:
-            self.cbLog("debug", "Tx: Message from app: " +  str(appCommand))
+            #self.cbLog("debug", "Tx: Message from app: " +  str(appCommand))
             if True:
             #try:
                 reactor.callInThread(self.transmitThread, base64.b64decode(appCommand["data"]))
