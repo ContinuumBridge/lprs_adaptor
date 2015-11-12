@@ -94,7 +94,13 @@ class Adaptor(CbAdaptor):
         while not self.doStop:
             if True:
             #try:
-                message = self.ser.read(256)
+                message = ''
+                message += self.ser.read(1)
+                time.sleep(0.005)
+                while self.ser.inWaiting() > 0:
+                    time.sleep(0.005)
+                    message += self.ser.read(1)
+                #message = self.ser.read(256)
                 #reactor.callFromThread(self.cbLog, "debug", "Message received from radio, length:" + str(len(message)))
                 if not self.doStop:
                     if message !='':
