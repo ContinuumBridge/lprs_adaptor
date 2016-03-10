@@ -16,17 +16,16 @@ from twisted.internet import threads
 from twisted.internet import reactor
 
 LPRS_TYPE           = os.getenv('CB_LPRS_TYPE', 'ERA')
-GALVANIZE_TYPE      = os.getenv('CB_GALVANIZE_TYPE', 'BRIDGE')
-GALVANIZE_ADDRESS   = int(os.getenv('CB_GALVANIZE_ADDRESS', '0x0000'), 16)
 
 class Adaptor(CbAdaptor):
     def __init__(self, argv):
         self.status =           "ok"
         self.state =            "stopped"
         self.stop = False
-        self.apps =             {"galvanize_button": []}
+        self.apps =             {"spur": []}
         self.toSend = 0
         self.tracking = {}
+        self.count = 0
         reactor.callLater(0.5, self.initRadio)
         # super's __init__ must be called:
         #super(Adaptor, self).__init__(argv)
@@ -64,6 +63,7 @@ class Adaptor(CbAdaptor):
                 bytesize=serial.EIGHTBITS,
                 timeout = 0.5
             )
+            reactor.callInThread(self.listen)
         except Exception as ex:
             self.cbLog("error", "Problems setting up serial port. Exception: " + str(type(ex)) + ", " + str(ex.args))
         else:
@@ -76,16 +76,9 @@ class Adaptor(CbAdaptor):
                     self.ser.write("ACK")
                     time.sleep(2)
                 """
-                self.ser.write("ER_CMD#a00")
-                time.sleep(2)
-                self.ser.write("ACK")
-                time.sleep(2)
                 # Set bandwidth to 12.5 KHz
                 self.ser.write("ER_CMD#B0")
-                time.sleep(2)
-                self.ser.write("ACK")
                 self.cbLog("info", "Radio initialised")
-                reactor.callInThread(self.listen)
             except Exception as ex:
                 self.cbLog("warning", "Unable to initialise radio. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
@@ -100,20 +93,36 @@ class Adaptor(CbAdaptor):
                 while self.ser.inWaiting() > 0:
                     time.sleep(0.005)
                     message += self.ser.read(1)
-                #message = self.ser.read(256)
                 #reactor.callFromThread(self.cbLog, "debug", "Message received from radio, length:" + str(len(message)))
                 if not self.doStop:
                     if message !='':
-                        #self.cbLog("debug", "Rx: " + str(message.encode("hex")))
-                        data = base64.b64encode(message)
-                        reactor.callFromThread(self.sendCharacteristic, "galvanize_button", data, time.time())
+                        #hexMessage = str(message.encode("hex"))
+                        reactor.callFromThread(self.cbLog, "debug", "Rx: " + str(message))
+                        if message == "ER_CMD#B0":
+                            self.ser.write("ACK")
+                            reactor.callFromThread(self.cbLog, "debug", "Sent ACK")
+                        else:
+                            data = base64.b64encode(message)
+                            reactor.callFromThread(self.sendCharacteristic, "spur", data, time.time())
+                            if message == "Hello World":
+                                reactor.callFromThread(self.delaySendHelloButton)
             #except Exception as ex:
             #    self.cbLog("warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
+
+    def delaySendHelloButton(self):
+        reactor.callLater(0.5, self.sendHelloButton)
+
+    def sendHelloButton(self):
+        reactor.callLater(0.5, self.ser.write, "Hello Button")
+        self.cbLog("debug", "Sent Hello Button")
 
     def transmitThread(self, message):
         try:
             #self.cbLog("debug", "Tx: " + str(message.encode("hex")))
             self.ser.write(message)
+            self.count += 1
+            #self.ser.write(str(self.count))
+            #self.cbLog("debug", "Send " + str(self.count))
         except Exception as ex:
             reactor.callFromThread(self.cbLog, "warning", "Problem sending message. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
@@ -127,7 +136,7 @@ class Adaptor(CbAdaptor):
         resp = {"name": self.name,
                 "id": self.id,
                 "status": tagStatus,
-                "service": [{"characteristic": "galvanize_button",
+                "service": [{"characteristic": "spur",
                              "interval": 0}
                             ],
                 "content": "service"}
@@ -161,7 +170,6 @@ class Adaptor(CbAdaptor):
             May be called again if there is a new configuration, which
             could be because a new app has been added.
         """
-        self.cbLog("debug", "GALVANIZE_TYPE: " + GALVANIZE_TYPE)
         self.setState("starting")
 
 if __name__ == '__main__':
