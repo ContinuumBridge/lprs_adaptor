@@ -96,8 +96,8 @@ class Adaptor(CbAdaptor):
                 #reactor.callFromThread(self.cbLog, "debug", "Message received from radio, length:" + str(len(message)))
                 if not self.doStop:
                     if message !='':
-                        #hexMessage = str(message.encode("hex"))
-                        reactor.callFromThread(self.cbLog, "debug", "Rx: " + str(message))
+                        hexMessage = str(message.encode("hex"))
+                        reactor.callFromThread(self.cbLog, "debug", "Rx: " + hexMessage)
                         if message == "ER_CMD#B0":
                             self.ser.write("ACK")
                             reactor.callFromThread(self.cbLog, "debug", "Sent ACK")
