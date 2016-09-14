@@ -3,8 +3,8 @@
     "protocol": "peripheral", 
     "name": "LPRS Adaptor", 
     "device_resource": "/api/bridge/v1/device/61", 
-    "url": "https://github.com/ContinuumBridge/lprs_adaptor/archive/v0.2.2.tar.gz", 
-    "version": "0.2.2", 
+    "url": "https://github.com/ContinuumBridge/lprs_adaptor/archive/v1.0.0.tar.gz", 
+    "version": "1.0.0", 
     "provider": "ContinuumBridge", 
     "adaptor_resource": "/api/bridge/v1/adaptor/24", 
     "description": "Implements ContinuumBridge protocol"

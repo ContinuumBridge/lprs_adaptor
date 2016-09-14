@@ -100,7 +100,11 @@ class Adaptor(CbAdaptor):
                         reactor.callFromThread(self.cbLog, "debug", "Rx: " + hexMessage)
                         if message == "ER_CMD#B0":
                             self.ser.write("ACK")
-                            reactor.callFromThread(self.cbLog, "debug", "Sent ACK")
+                            reactor.callFromThread(self.cbLog, "info", "Sent ACK for OTA bandwidth")
+                            reactor.callLater(1, self.setFrequency)
+                        elif message == "ER_CMD#C6":
+                            self.ser.write("ACK")
+                            reactor.callFromThread(self.cbLog, "info", "Sent ACK for frequency")
                         else:
                             data = base64.b64encode(message)
                             reactor.callFromThread(self.sendCharacteristic, "spur", data, time.time())
@@ -108,6 +112,9 @@ class Adaptor(CbAdaptor):
                                 reactor.callFromThread(self.delaySendHelloButton)
             #except Exception as ex:
             #    self.cbLog("warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
+
+    def setFrequency(self):
+        self.ser.write("ER_CMD#C6")
 
     def delaySendHelloButton(self):
         reactor.callLater(0.5, self.sendHelloButton)
