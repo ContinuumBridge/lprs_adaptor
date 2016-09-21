@@ -26,6 +26,8 @@ class Adaptor(CbAdaptor):
         self.toSend = 0
         self.tracking = {}
         self.count = 0
+        self.channel = 0
+        self.listening = False
         reactor.callLater(0.5, self.initRadio)
         # super's __init__ must be called:
         #super(Adaptor, self).__init__(argv)
@@ -63,7 +65,6 @@ class Adaptor(CbAdaptor):
                 bytesize=serial.EIGHTBITS,
                 timeout = 0.5
             )
-            reactor.callInThread(self.listen)
         except Exception as ex:
             self.cbLog("error", "Problems setting up serial port. Exception: " + str(type(ex)) + ", " + str(ex.args))
         else:
@@ -84,6 +85,7 @@ class Adaptor(CbAdaptor):
 
     def listen(self):
         # Called in thread
+        self.listening = True
         while not self.doStop:
             if True:
             #try:
@@ -102,9 +104,10 @@ class Adaptor(CbAdaptor):
                             self.ser.write("ACK")
                             reactor.callFromThread(self.cbLog, "info", "Sent ACK for OTA bandwidth")
                             reactor.callLater(1, self.setFrequency)
-                        elif message == "ER_CMD#C6":
-                            self.ser.write("ACK")
-                            reactor.callFromThread(self.cbLog, "info", "Sent ACK for frequency")
+                        elif len(message) == 9:
+                            if message[0:8] == "ER_CMD#C":
+                                self.ser.write("ACK")
+                                reactor.callFromThread(self.cbLog, "info", "Sent ACK for frequency")
                         else:
                             data = base64.b64encode(message)
                             reactor.callFromThread(self.sendCharacteristic, "spur", data, time.time())
@@ -114,7 +117,9 @@ class Adaptor(CbAdaptor):
             #    self.cbLog("warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
     def setFrequency(self):
-        self.ser.write("ER_CMD#C6")
+        command = "ER_CMD#" + str(self.channel)
+        self.cbLog("info", "setFrequency, channel command: {}".format(command))
+        self.ser.write(command)
 
     def delaySendHelloButton(self):
         reactor.callLater(0.5, self.sendHelloButton)
@@ -151,6 +156,7 @@ class Adaptor(CbAdaptor):
         self.setState("running")
         
     def onAppRequest(self, message):
+        self.cbLog("debug", "onAppRequest, message: {}".format(message))
         # Switch off anything that already exists for this app
         for a in self.apps:
             if message["id"] in self.apps[a]:
@@ -159,6 +165,12 @@ class Adaptor(CbAdaptor):
         for f in message["service"]:
             if message["id"] not in self.apps[f["characteristic"]]:
                 self.apps[f["characteristic"]].append(message["id"])
+            if "service" in message:
+                for s in message["service"]:
+                    if "channel" in s:
+                        self.channel = s["channel"]
+        if not self.listening:
+            reactor.callInThread(self.listen)
         self.cbLog("debug", "apps: " + str(self.apps))
 
     def onAppCommand(self, appCommand):
@@ -166,11 +178,10 @@ class Adaptor(CbAdaptor):
             self.cbLog("warning", "app message without data: " + str(message))
         else:
             #self.cbLog("debug", "Tx: Message from app: " +  str(appCommand))
-            if True:
-            #try:
+            try:
                 reactor.callInThread(self.transmitThread, base64.b64decode(appCommand["data"]))
-            #except Exception as ex:
-            #    self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
+            except Exception as ex:
+                self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
     def onConfigureMessage(self, config):
         """Config is based on what apps are to be connected.
