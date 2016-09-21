@@ -117,7 +117,7 @@ class Adaptor(CbAdaptor):
             #    self.cbLog("warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
     def setFrequency(self):
-        command = "ER_CMD#" + str(self.channel)
+        command = "ER_CMD#C" + str(self.channel)
         self.cbLog("info", "setFrequency, channel command: {}".format(command))
         self.ser.write(command)
 
