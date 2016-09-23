@@ -27,6 +27,7 @@ class Adaptor(CbAdaptor):
         self.tracking = {}
         self.count = 0
         self.channel = 0
+        self.bandwidth = 0
         self.listening = False
         reactor.callLater(0.5, self.initRadio)
         # super's __init__ must be called:
@@ -77,15 +78,18 @@ class Adaptor(CbAdaptor):
                     self.ser.write("ACK")
                     time.sleep(2)
                 """
-                # Set bandwidth to 12.5 KHz
-                self.ser.write("ER_CMD#B0")
-                self.cbLog("info", "Radio initialised")
             except Exception as ex:
                 self.cbLog("warning", "Unable to initialise radio. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
     def listen(self):
         # Called in thread
-        self.listening = True
+        self.cbLog("debug", "Starting listen")
+        if not self.listening:
+            # Set bandwidth to 12.5 KHz
+            #self.ser.write("ER_CMD#B0")
+            self.ser.write("ER_CMD#B1")
+            self.cbLog("info", "Radio initialised")
+            self.listening = True
         while not self.doStop:
             if True:
             #try:
@@ -100,7 +104,7 @@ class Adaptor(CbAdaptor):
                     if message !='':
                         hexMessage = str(message.encode("hex"))
                         reactor.callFromThread(self.cbLog, "debug", "Rx: " + hexMessage)
-                        if message == "ER_CMD#B0":
+                        if message == "ER_CMD#B1":
                             self.ser.write("ACK")
                             reactor.callFromThread(self.cbLog, "info", "Sent ACK for OTA bandwidth")
                             reactor.callLater(1, self.setFrequency)
@@ -169,6 +173,8 @@ class Adaptor(CbAdaptor):
                 for s in message["service"]:
                     if "channel" in s:
                         self.channel = s["channel"]
+                    if "bandwidth" in s:
+                        self.bandwidth = s["channel"]
         if not self.listening:
             reactor.callInThread(self.listen)
         self.cbLog("debug", "apps: " + str(self.apps))
