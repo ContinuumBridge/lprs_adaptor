@@ -29,6 +29,7 @@ class Adaptor(CbAdaptor):
         self.channel = 0
         self.bandwidth = 0
         self.listening = False
+        self.gettingRSSI = False
         reactor.callLater(0.5, self.initRadio)
         # super's __init__ must be called:
         #super(Adaptor, self).__init__(argv)
@@ -108,10 +109,16 @@ class Adaptor(CbAdaptor):
                             self.ser.write("ACK")
                             reactor.callFromThread(self.cbLog, "info", "Sent ACK for OTA bandwidth")
                             reactor.callLater(1, self.setFrequency)
-                        elif len(message) == 9:
-                            if message[0:8] == "ER_CMD#C":
-                                self.ser.write("ACK")
-                                reactor.callFromThread(self.cbLog, "info", "Sent ACK for frequency")
+                        elif self.gettingRSSI:
+                            self.gettingRSSI = False
+                            if len(message) == 9:
+                                if message == "ER_CMD#T8":
+                                    self.ser.write("ACK")
+                                    reactor.callFromThread(self.cbLog, "info", "RSSI: {}".format(message))
+                                    reactor.callFromThread(self.sendCharacteristic, "rssi", message, time.time())
+                                if message[0:8] == "ER_CMD#C":
+                                    self.ser.write("ACK")
+                                    reactor.callFromThread(self.cbLog, "info", "Sent ACK for frequency")
                         else:
                             data = base64.b64encode(message)
                             reactor.callFromThread(self.sendCharacteristic, "spur", data, time.time())
@@ -141,6 +148,9 @@ class Adaptor(CbAdaptor):
             #self.cbLog("debug", "Send " + str(self.count))
         except Exception as ex:
             reactor.callFromThread(self.cbLog, "warning", "Problem sending message. Exception: " + str(type(ex)) + ", " + str(ex.args))
+
+    defcheckGotRSSI(self):
+        self.gettingRSSI = False
 
     def onAppInit(self, message):
         """
@@ -180,14 +190,22 @@ class Adaptor(CbAdaptor):
         self.cbLog("debug", "apps: " + str(self.apps))
 
     def onAppCommand(self, appCommand):
-        if "data" not in appCommand:
-            self.cbLog("warning", "app message without data: " + str(message))
-        else:
+        if "data" in appCommand:
             #self.cbLog("debug", "Tx: Message from app: " +  str(appCommand))
             try:
                 reactor.callInThread(self.transmitThread, base64.b64decode(appCommand["data"]))
             except Exception as ex:
                 self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
+        elif "command" in appCommand:
+            if appCommand["command"] == "get_rssi":
+                try:
+                    self.gettingRSSI = True
+                    reactor.callLater(2, self.checkGotRSSI)
+                    reactor.callInThread(self.transmitThread, "ER_CMD#T8")
+                except Exception as ex:
+                    self.cbLog("warning", "Problem ending get RSSI. Exception: " + str(type(ex)) + ", " + str(ex.args))
+        else:
+            self.cbLog("warning", "invalid app message: {}".format(message))
 
     def onConfigureMessage(self, config):
         """Config is based on what apps are to be connected.
