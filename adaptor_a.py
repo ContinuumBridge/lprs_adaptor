@@ -22,7 +22,8 @@ class Adaptor(CbAdaptor):
         self.status =           "ok"
         self.state =            "stopped"
         self.stop = False
-        self.apps =             {"spur": []}
+        self.apps =             {"spur": [],
+                                 "rssi": []}
         self.toSend = 0
         self.tracking = {}
         self.count = 0
@@ -30,6 +31,7 @@ class Adaptor(CbAdaptor):
         self.bandwidth = 0
         self.listening = False
         self.gettingRSSI = False
+        self.ackdRSSI = False
         reactor.callLater(0.5, self.initRadio)
         # super's __init__ must be called:
         #super(Adaptor, self).__init__(argv)
@@ -105,17 +107,22 @@ class Adaptor(CbAdaptor):
                     if message !='':
                         hexMessage = str(message.encode("hex"))
                         reactor.callFromThread(self.cbLog, "debug", "Rx: " + hexMessage)
+                        if self.ackdRSSI:
+                            self.ackdRSSI = False
+                            self.gettingRSSI = False
+                            rssi = int(message[:message.index("d")])
+                            reactor.callFromThread(self.cbLog, "info", "RSSI: {} dBm".format(rssi))
+                            reactor.callFromThread(self.sendCharacteristic, "rssi", rssi, time.time())
                         if message == "ER_CMD#B1":
                             self.ser.write("ACK")
                             reactor.callFromThread(self.cbLog, "info", "Sent ACK for OTA bandwidth")
                             reactor.callLater(1, self.setFrequency)
                         elif self.gettingRSSI:
-                            self.gettingRSSI = False
                             if len(message) == 9:
                                 if message == "ER_CMD#T8":
                                     self.ser.write("ACK")
-                                    reactor.callFromThread(self.cbLog, "info", "RSSI: {}".format(message))
-                                    reactor.callFromThread(self.sendCharacteristic, "rssi", message, time.time())
+                                    self.ackdRSSI = True
+                                    reactor.callFromThread(self.cbLog, "debug", "acknowledged RSSI")
                                 if message[0:8] == "ER_CMD#C":
                                     self.ser.write("ACK")
                                     reactor.callFromThread(self.cbLog, "info", "Sent ACK for frequency")
@@ -149,7 +156,7 @@ class Adaptor(CbAdaptor):
         except Exception as ex:
             reactor.callFromThread(self.cbLog, "warning", "Problem sending message. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
-    defcheckGotRSSI(self):
+    def checkGotRSSI(self):
         self.gettingRSSI = False
 
     def onAppInit(self, message):
@@ -158,14 +165,22 @@ class Adaptor(CbAdaptor):
         Called in a thread and so it is OK if it blocks.
         Called separately for every app that can make requests.
         """
-        tagStatus = "ok"
-        resp = {"name": self.name,
-                "id": self.id,
-                "status": tagStatus,
-                "service": [{"characteristic": "spur",
-                             "interval": 0}
-                            ],
-                "content": "service"}
+        resp = {
+            "name": self.name,
+            "id": self.id,
+            "status": "ok",
+            "service": [
+                {
+                    "characteristic": "spur",
+                    "interval": 0
+                },
+                {
+                    "characteristic": "rssi",
+                    "interval": 0
+                }
+            ],
+            "content": "service"
+        }
         self.sendMessage(resp, message["id"])
         self.setState("running")
         
