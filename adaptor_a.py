@@ -94,8 +94,7 @@ class Adaptor(CbAdaptor):
             self.cbLog("info", "Radio initialised")
             self.listening = True
         while not self.doStop:
-            if True:
-            #try:
+            try:
                 message = ''
                 message += self.ser.read(1)
                 time.sleep(0.005)
@@ -108,11 +107,16 @@ class Adaptor(CbAdaptor):
                         hexMessage = str(message.encode("hex"))
                         reactor.callFromThread(self.cbLog, "debug", "Rx: " + hexMessage)
                         if self.ackdRSSI:
-                            self.ackdRSSI = False
-                            self.gettingRSSI = False
-                            rssi = int(message[:message.index("d")])
-                            reactor.callFromThread(self.cbLog, "info", "RSSI: {} dBm".format(rssi))
-                            reactor.callFromThread(self.sendCharacteristic, "rssi", rssi, time.time())
+                            try:
+                                self.ackdRSSI = False
+                                self.gettingRSSI = False
+                                rssi = int(message[:message.index("d")])
+                                reactor.callFromThread(self.cbLog, "info", "RSSI: {} dBm".format(rssi))
+                                reactor.callFromThread(self.sendCharacteristic, "rssi", rssi, time.time())
+                            except Exception as ex:
+                                self.ackdRSSI = False
+                                self.gettingRSSI = False
+                                reactor.callFromThread(self.cbLog, "debug", "Problem getting rssi: {}, {}".format(type(ex), ex.args))
                         if message == "ER_CMD#B1":
                             self.ser.write("ACK")
                             reactor.callFromThread(self.cbLog, "info", "Sent ACK for OTA bandwidth")
@@ -131,8 +135,8 @@ class Adaptor(CbAdaptor):
                             reactor.callFromThread(self.sendCharacteristic, "spur", data, time.time())
                             if message == "Hello World":
                                 reactor.callFromThread(self.delaySendHelloButton)
-            #except Exception as ex:
-            #    self.cbLog("warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
+            except Exception as ex:
+                reactor.callFromThread(self.cbLog, "warning", "Problem in listen. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
     def setFrequency(self):
         command = "ER_CMD#C" + str(self.channel)
