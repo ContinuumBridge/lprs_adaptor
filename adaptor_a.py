@@ -16,6 +16,7 @@ from twisted.internet import threads
 from twisted.internet import reactor
 
 LPRS_TYPE           = os.getenv('CB_LPRS_TYPE', 'ERA')
+TX_INTERVAL         = 0.05
 
 class Adaptor(CbAdaptor):
     def __init__(self, argv):
@@ -24,6 +25,7 @@ class Adaptor(CbAdaptor):
         self.stop = False
         self.apps =             {"spur": [],
                                  "rssi": []}
+        self.transmitQueue = []
         self.toSend = 0
         self.tracking = {}
         self.count = 0
@@ -150,13 +152,13 @@ class Adaptor(CbAdaptor):
         reactor.callLater(0.5, self.ser.write, "Hello Button")
         self.cbLog("debug", "Sent Hello Button")
 
-    def transmitThread(self, message):
+    def transmit(self):
         try:
             #self.cbLog("debug", "Tx: " + str(message.encode("hex")))
-            self.ser.write(message)
-            self.count += 1
-            #self.ser.write(str(self.count))
-            #self.cbLog("debug", "Send " + str(self.count))
+            if self.transmitQueue:
+                self.ser.write(self.transmitQueue[0])
+                del self.transmitQueue[0]
+            reactor.callLater(TX_INTERVAL, self.transmit)
         except Exception as ex:
             reactor.callFromThread(self.cbLog, "warning", "Problem sending message. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
@@ -212,7 +214,7 @@ class Adaptor(CbAdaptor):
         if "data" in appCommand:
             #self.cbLog("debug", "Tx: Message from app: " +  str(appCommand))
             try:
-                reactor.callInThread(self.transmitThread, base64.b64decode(appCommand["data"]))
+                self.transmitQueue.append(base64.b64decode(appCommand["data"]))
             except Exception as ex:
                 self.cbLog("warning", "Problem formatting message. Exception: " + str(type(ex)) + ", " + str(ex.args))
         elif "command" in appCommand:
@@ -220,7 +222,7 @@ class Adaptor(CbAdaptor):
                 try:
                     self.gettingRSSI = True
                     reactor.callLater(2, self.checkGotRSSI)
-                    reactor.callInThread(self.transmitThread, "ER_CMD#T8")
+                    self.transmitQueue.append("ER_CMD#T8")
                 except Exception as ex:
                     self.cbLog("warning", "Problem ending get RSSI. Exception: " + str(type(ex)) + ", " + str(ex.args))
         else:
@@ -232,6 +234,7 @@ class Adaptor(CbAdaptor):
             could be because a new app has been added.
         """
         self.setState("starting")
+        reactor.callLater(TX_INTERVAL, self.transmit)
 
 if __name__ == '__main__':
     adaptor = Adaptor(sys.argv)
