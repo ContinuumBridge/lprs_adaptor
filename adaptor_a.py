@@ -220,9 +220,12 @@ class Adaptor(CbAdaptor):
         elif "command" in appCommand:
             if appCommand["command"] == "get_rssi":
                 try:
-                    self.gettingRSSI = True
-                    reactor.callLater(2, self.checkGotRSSI)
-                    self.transmitQueue.append("ER_CMD#T8")
+                    if not self.transmitQueue:
+                        self.gettingRSSI = True
+                        reactor.callLater(2, self.checkGotRSSI)
+                        self.transmitQueue.append("ER_CMD#T8")
+                    else:
+                        self.cbLog("info", "Not checking RSSI because there is already something in the transmit queue")
                 except Exception as ex:
                     self.cbLog("warning", "Problem ending get RSSI. Exception: " + str(type(ex)) + ", " + str(ex.args))
         else:
