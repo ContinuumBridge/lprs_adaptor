@@ -164,8 +164,9 @@ class Adaptor(CbAdaptor):
 
     def checkGotRSSI(self):
         # If something went wrong, return a low RSSI. This will still be sent to client with include_req, but bridge will be ignored if more than 1
-        self.sendCharacteristic("rssi", -1000, time.time())
-        self.gettingRSSI = False
+        if self.gettingRSSI:
+            self.sendCharacteristic("rssi", -1000, time.time())
+            self.gettingRSSI = False
 
     def onAppInit(self, message):
         """
