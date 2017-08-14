@@ -129,9 +129,9 @@ class Adaptor(CbAdaptor):
                                     self.ser.write("ACK")
                                     self.ackdRSSI = True
                                     reactor.callFromThread(self.cbLog, "debug", "acknowledged RSSI")
-                                if message[0:8] == "ER_CMD#C":
-                                    self.ser.write("ACK")
-                                    reactor.callFromThread(self.cbLog, "info", "Sent ACK for frequency")
+                        elif message[0:8] == "ER_CMD#C":
+                            self.ser.write("ACK")
+                            reactor.callFromThread(self.cbLog, "info", "Sent ACK for frequency")
                         else:
                             data = base64.b64encode(message)
                             reactor.callFromThread(self.sendCharacteristic, "spur", data, time.time())
@@ -163,6 +163,8 @@ class Adaptor(CbAdaptor):
             reactor.callFromThread(self.cbLog, "warning", "Problem sending message. Exception: " + str(type(ex)) + ", " + str(ex.args))
 
     def checkGotRSSI(self):
+        # If something went wrong, return a low RSSI. This will still be sent to client with include_req, but bridge will be ignored if more than 1
+        self.sendCharacteristic("rssi", -1000, time.time())
         self.gettingRSSI = False
 
     def onAppInit(self, message):
@@ -220,12 +222,9 @@ class Adaptor(CbAdaptor):
         elif "command" in appCommand:
             if appCommand["command"] == "get_rssi":
                 try:
-                    if not self.transmitQueue:
-                        self.gettingRSSI = True
-                        reactor.callLater(2, self.checkGotRSSI)
-                        self.transmitQueue.append("ER_CMD#T8")
-                    else:
-                        self.cbLog("info", "Not checking RSSI because there is already something in the transmit queue")
+                    self.gettingRSSI = True
+                    reactor.callLater(2, self.checkGotRSSI)
+                    self.transmitQueue.append("ER_CMD#T8")
                 except Exception as ex:
                     self.cbLog("warning", "Problem ending get RSSI. Exception: " + str(type(ex)) + ", " + str(ex.args))
         else:
